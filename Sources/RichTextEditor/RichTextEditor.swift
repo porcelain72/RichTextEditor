@@ -49,9 +49,11 @@ public struct RichTextEditor: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSTextView, context: Context) {
         if nsView.attributedString() != attributedText {
+            print("updateNSView: updating NSTextView contents")
             nsView.textStorage?.setAttributedString(attributedText)
         }
     }
+
 
     public class Coordinator: NSObject, NSTextViewDelegate {
         var parent: RichTextEditor
