@@ -61,8 +61,8 @@ public struct RichTextEditor: NSViewRepresentable {
 
     public class Coordinator: NSObject, NSTextViewDelegate {
         var parent: RichTextEditor
-        weak var textView: NSTextView?
-        weak var scrollView: NSScrollView?
+         var textView: NSTextView?
+         var scrollView: NSScrollView?
         var isSelfUpdate = false
         
         init(_ parent: RichTextEditor) {
@@ -109,4 +109,12 @@ public struct RichTextEditor: NSViewRepresentable {
             }
         }
     }
+}
+
+
+#Preview {
+    
+    RichTextEditor(attributedText: .constant(NSAttributedString(string: "Editor text")))
+        .frame(width: 600, height: 400)
+        .padding()
 }
