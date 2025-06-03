@@ -49,12 +49,9 @@ public struct RichTextEditor: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSTextView, context: Context) {
         // Only update from outside changes
-        guard !context.coordinator.isSelfUpdate else { return }
-
+      
         if nsView.textStorage?.string != attributedText.string {
-            context.coordinator.isSelfUpdate = true
             nsView.textStorage?.setAttributedString(attributedText)
-            context.coordinator.isSelfUpdate = false
         }
     }
 
@@ -63,7 +60,6 @@ public struct RichTextEditor: NSViewRepresentable {
         var parent: RichTextEditor
          var textView: NSTextView?
          var scrollView: NSScrollView?
-        var isSelfUpdate = false
         
         init(_ parent: RichTextEditor) {
             self.parent = parent
@@ -71,7 +67,7 @@ public struct RichTextEditor: NSViewRepresentable {
 
         public func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
-            guard !isSelfUpdate else { return }
+        
             parent.attributedText = textView.attributedString()
             scrollCaretIfNeeded()
         }
