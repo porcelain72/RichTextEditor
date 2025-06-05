@@ -116,7 +116,7 @@ public struct RichTextEditor: NSViewRepresentable {
 
 #Preview {
     
-    RichTextEditor(attributedText: .constant(NSAttributedString(string: "Editor text")))
+    RichTextEditor(attributedText: .constant(NSAttributedString(string: "Editor text")), inspector: .constant(UUID()))
         .frame(width: 600, height: 400)
         .padding()
 }
