@@ -1,6 +1,33 @@
 import SwiftUI
 import AppKit
 
+/// A tiny NSScrollView subclass that will accept first responder and forward it
+/// immediately to its `documentView` (the NSTextView).
+public final class FocusingScrollView: NSScrollView {
+    public  override var acceptsFirstResponder: Bool {
+        return true
+    }
+    public  override func becomeFirstResponder() -> Bool {
+        // If the documentView can become first responder, make it first‐responder instead.
+        if let tv = self.documentView as? NSTextView, tv.acceptsFirstResponder {
+            return tv.becomeFirstResponder()
+        }
+        return super.becomeFirstResponder()
+    }
+
+    // Also, if the user clicks anywhere in the scroll view, forward that click to the text view.
+    public  override func hitTest(_ point: NSPoint) -> NSView? {
+        // Convert to textView’s coordinate system and see if that subview wants the click:
+        if let tv = self.documentView as? NSTextView {
+            let tvPoint = self.convert(point, to: tv)
+            if tv.bounds.contains(tvPoint) {
+                return tv.hitTest(tvPoint)
+            }
+        }
+        return super.hitTest(point)
+    }
+}
+
 public struct RichTextEditor: NSViewRepresentable {
     @Binding public var attributedText: NSAttributedString
     @Binding public var inspectorVersion: UUID
@@ -20,10 +47,10 @@ public struct RichTextEditor: NSViewRepresentable {
         Coordinator(self)
     }
 
-    /// Note: change return type to NSScrollView so SwiftUI will embed the scroll view directly.
-    public func makeNSView(context: Context) -> NSScrollView {
-        // 1) Create the scroll view
-        let scrollView = NSScrollView()
+    /// Return the FocusingScrollView so clicks inside it can become first responder.
+    public func makeNSView(context: Context) -> FocusingScrollView {
+        // 1) Create our custom scroll view
+        let scrollView = FocusingScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
@@ -36,16 +63,15 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.backgroundColor = .clear
-        // Let width track the scroll view’s content width
         textView.textContainer?.widthTracksTextView = true
 
         // Initialize with the bound attributed text
         textView.textStorage?.setAttributedString(attributedText)
 
-        // Set delegate so we catch typing changes
+        // Set delegate to catch typing
         textView.delegate = context.coordinator
 
-        // We want to know when the selection (caret) moves
+        // Let us know when the selection (caret) moves
         NotificationCenter.default.addObserver(
             context.coordinator,
             selector: #selector(Coordinator.textViewSelectionDidChange(_:)),
@@ -55,19 +81,18 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.postsFrameChangedNotifications = true
         textView.postsBoundsChangedNotifications = true
 
-        // Embed the text view inside the scroll view
+        // Embed the NSTextView into our focusing scroll view
         scrollView.documentView = textView
 
-        // Keep references in the coordinator
+        // Store references in the coordinator
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
 
         return scrollView
     }
 
-    public func updateNSView(_ nsView: NSScrollView, context: Context) {
-        // Whenever the binding changes, update the text storage unconditionally.
-        // (We could compare isEqual(to:), but simpler to always overwrite when the model changes.)
+    public func updateNSView(_ nsView: FocusingScrollView, context: Context) {
+        // Whenever the binding changes, update the text storage unconditionally
         guard let textView = nsView.documentView as? NSTextView else {
             return
         }
@@ -104,34 +129,25 @@ public struct RichTextEditor: NSViewRepresentable {
             }
 
             let selectedRange = textView.selectedRange()
-            // Make sure the caret index is in bounds
             guard selectedRange.location <= layoutManager.numberOfGlyphs else {
                 return
             }
 
-            // Compute the caret’s bounding rect within the text view’s coordinate system
             let caretRect = layoutManager.boundingRect(
                 forGlyphRange: NSRange(location: selectedRange.location, length: 0),
                 in: textContainer
             )
 
-            // The bottom‐most visible Y in the scroll view’s clip view
             let visibleRect = scrollView.contentView.bounds
             let visibleHeight = visibleRect.height
             let visibleOriginY = visibleRect.origin.y
 
-            // The caret’s bottom Y in text‐view coordinates
             let caretBottomY = caretRect.maxY
-
-            // How far down the caret is into the visible region
             let caretBottomInVisible = caretBottomY - visibleOriginY
-
-            // If the caret is closer than `minimumBottomPadding` to the bottom edge, scroll
             let threshold = visibleHeight - parent.minimumBottomPadding
+
             if caretBottomInVisible > threshold {
-                // Compute the new origin Y so the caret becomes threshold points from the bottom
                 let targetY = caretBottomY - visibleHeight + parent.minimumBottomPadding
-                // Clamp to valid scroll range
                 let maxY = textView.bounds.height - visibleHeight
                 let constrainedY = min(max(targetY, 0), maxY)
                 scrollView.contentView.scroll(to: NSPoint(x: 0, y: constrainedY))
@@ -139,12 +155,4 @@ public struct RichTextEditor: NSViewRepresentable {
             }
         }
     }
-}
-
-
-#Preview {
-    
-    RichTextEditor(attributedText: .constant(NSAttributedString(string: "Editor text")), inspector: .constant(UUID()))
-        .frame(width: 600, height: 400)
-        .padding()
 }
