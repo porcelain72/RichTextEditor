@@ -3,10 +3,14 @@ import AppKit
 
 public struct RichTextEditor: NSViewRepresentable {
     @Binding public var attributedText: NSAttributedString
+    
+    @Binding public var inspectorVersion : UUID
+    
     public var minimumBottomPadding: CGFloat
 
-    public init(attributedText: Binding<NSAttributedString>, minimumBottomPadding: CGFloat = 40) {
+    public init(attributedText: Binding<NSAttributedString>,inspector: Binding<UUID>, minimumBottomPadding: CGFloat = 40) {
         self._attributedText = attributedText
+        self._inspectorVersion = inspector
         self.minimumBottomPadding = minimumBottomPadding
     }
 
