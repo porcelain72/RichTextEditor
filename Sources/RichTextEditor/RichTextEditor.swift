@@ -48,7 +48,7 @@ public struct RichTextEditor: NSViewRepresentable {
     }
 
     /// Return the FocusingScrollView so clicks inside it can become first responder.
-    public func makeNSView(context: Context) -> FocusingScrollView {
+    public func makeNSView(context: Context) -> NSTextView {
         // 1) Create our custom scroll view
         let scrollView = FocusingScrollView()
         scrollView.hasVerticalScroller = true
@@ -88,15 +88,16 @@ public struct RichTextEditor: NSViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
 
-        return scrollView
+        return textView
     }
 
-    public func updateNSView(_ nsView: FocusingScrollView, context: Context) {
+    public func updateNSView(_ nsView: NSTextView, context: Context) {
         // Whenever the binding changes, update the text storage unconditionally
-        guard let textView = nsView.documentView as? NSTextView else {
+      /*  guard let textView = nsView.documentView as? NSTextView else {
             return
         }
-        textView.textStorage?.setAttributedString(attributedText)
+       */
+        nsView.textStorage?.setAttributedString(attributedText)
     }
 
     public class Coordinator: NSObject, NSTextViewDelegate {
