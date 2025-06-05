@@ -49,10 +49,12 @@ public struct RichTextEditor: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSTextView, context: Context) {
         // Only update from outside changes
-      
+        nsView.textStorage?.setAttributedString(attributedText)
+/*
         if !nsView.attributedString().isEqual(to: attributedText) {
             nsView.textStorage?.setAttributedString(attributedText)
         }
+ */
     }
 
 
