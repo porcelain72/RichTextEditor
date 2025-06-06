@@ -1,8 +1,19 @@
 import SwiftUI
+#if canImport(AppKit)
 import AppKit
+#endif
 
+#if canImport(UIKit)
+
+import UIKit
+
+#endif
 /// A tiny NSScrollView subclass that will accept first responder and forward it
 /// immediately to its `documentView` (the NSTextView).
+///
+///
+
+#if os(macOS)
 public final class FocusingScrollView: NSScrollView {
     public  override var acceptsFirstResponder: Bool {
         return true
@@ -157,3 +168,127 @@ public struct RichTextEditor: NSViewRepresentable {
         }
     }
 }
+#endif
+
+#if os(iOS)
+
+
+/// A SwiftUI wrapper around UITextView that two-way-binds to an NSAttributedString.
+/// On iOS, UITextView supports editing attributedText (fonts, colors, attributes).
+public struct RichTextEditor: UIViewRepresentable {
+    @Binding public var attributedText: NSAttributedString
+    @Binding public var inspectorVersion: UUID
+    public var minimumBottomPadding: CGFloat
+
+    public init(
+        attributedText: Binding<NSAttributedString>,
+        inspector: Binding<UUID>,
+        minimumBottomPadding: CGFloat = 40
+    ) {
+        self._attributedText = attributedText
+        self._inspectorVersion = inspector
+        self.minimumBottomPadding = minimumBottomPadding
+    }
+
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    public func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.isEditable = true
+        textView.isScrollEnabled = true
+        textView.backgroundColor = UIColor.clear
+        textView.delegate = context.coordinator
+        textView.attributedText = attributedText
+        textView.typingAttributes = defaultTypingAttributes()
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+
+        // Observe selection change for caret-scrolling
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.selectionDidChange(_:)),
+            name: UITextView.textDidChangeNotification,
+            object: textView
+        )
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.selectionDidChange(_:)),
+            name: UITextView.textDidBeginEditingNotification,
+            object: textView
+        )
+        return textView
+    }
+
+    public func updateUIView(_ uiView: UITextView, context: Context) {
+        // If inspector changed (attributes updated), reapply attributedText
+        if !uiView.attributedText.isEqual(to: attributedText) {
+            let selectedRange = uiView.selectedRange
+            uiView.attributedText = attributedText
+            uiView.selectedRange = selectedRange
+        }
+        // Ensure typingAttributes match current caret attributes
+        uiView.typingAttributes = defaultTypingAttributes()
+    }
+
+    /// Build default typing attributes from the current attributedText at caret (or start)
+    private func defaultTypingAttributes() -> [NSAttributedString.Key: Any] {
+        // If attributedText has content, read the attributes at location 0
+        if attributedText.length > 0 {
+            let attrs = attributedText.attributes(at: 0, effectiveRange: nil)
+            return attrs
+        }
+        // Fallback to system font if empty
+        return [
+            .font: UIFont.systemFont(ofSize: UIFont.systemFontSize),
+            .foregroundColor: UIColor.label
+        ]
+    }
+
+    public class Coordinator: NSObject, UITextViewDelegate {
+        var parent: RichTextEditor
+        init(_ parent: RichTextEditor) {
+            self.parent = parent
+        }
+
+        public func textViewDidChange(_ textView: UITextView) {
+            // Push the updated attributedText back to SwiftUI
+            parent.attributedText = textView.attributedText
+            scrollCaretIfNeeded(textView)
+        }
+
+        @objc func selectionDidChange(_ notification: Notification) {
+            if let tv = notification.object as? UITextView {
+                scrollCaretIfNeeded(tv)
+            }
+        }
+
+        private func scrollCaretIfNeeded(_ textView: UITextView) {
+            // Compute caret rect in textView coordinates
+            guard let selectedRange = textView.selectedTextRange else { return }
+            let caretRect = textView.caretRect(for: selectedRange.end)
+            let visibleRect = CGRect(
+                x: textView.contentOffset.x,
+                y: textView.contentOffset.y,
+                width: textView.bounds.width,
+                height: textView.bounds.height
+            )
+
+            // If caret is too close to bottom, scroll so it stays above minimumBottomPadding
+            let padding = parent.minimumBottomPadding
+            let caretMaxY = caretRect.maxY
+            let visibleMaxY = visibleRect.maxY
+
+            if caretMaxY > visibleMaxY - padding {
+                // Scroll so that caretMaxY == visibleMaxY - padding
+                var newOffset = textView.contentOffset
+                newOffset.y = caretMaxY - (visibleRect.height - padding)
+                newOffset.y = max(0, min(newOffset.y, textView.contentSize.height - visibleRect.height))
+                textView.setContentOffset(newOffset, animated: false)
+            }
+        }
+    }
+}
+
+#endif
