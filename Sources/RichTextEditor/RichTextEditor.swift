@@ -59,7 +59,7 @@ public struct RichTextEditor: NSViewRepresentable {
     }
 
     /// Return the FocusingScrollView so clicks inside it can become first responder.
-    public func makeNSView(context: Context) -> NSTextView {
+    public func makeNSView(context: Context) -> NSScrollView {
         // 1) Create our custom scroll view
         let scrollView = FocusingScrollView()
         scrollView.hasVerticalScroller = true
@@ -89,7 +89,6 @@ public struct RichTextEditor: NSViewRepresentable {
             name: NSTextView.didChangeSelectionNotification,
             object: textView
         )
-        textView.postsFrameChangedNotifications = true
         textView.postsBoundsChangedNotifications = true
 
         // Embed the NSTextView into our focusing scroll view
@@ -99,16 +98,18 @@ public struct RichTextEditor: NSViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
 
-        return textView
+        return scrollView
     }
 
-    public func updateNSView(_ nsView: NSTextView, context: Context) {
+    public func updateNSView(_ nsView: NSScrollView, context: Context) {
         // Whenever the binding changes, update the text storage unconditionally
       /*  guard let textView = nsView.documentView as? NSTextView else {
             return
         }
        */
-        nsView.textStorage?.setAttributedString(attributedText)
+        guard let textView = nsView.documentView as? NSTextView else { return }
+
+        textView.textStorage?.setAttributedString(attributedText)
     }
 
     public class Coordinator: NSObject, NSTextViewDelegate {
@@ -123,11 +124,15 @@ public struct RichTextEditor: NSViewRepresentable {
         public func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.attributedText = textView.attributedString()
-            scrollCaretIfNeeded()
+            DispatchQueue.main.async{
+                self.scrollCaretIfNeeded()
+            }
         }
 
         @objc func textViewSelectionDidChange(_ notification: Notification) {
-            scrollCaretIfNeeded()
+            DispatchQueue.main.async{
+                self.scrollCaretIfNeeded()
+            }
         }
 
         private func scrollCaretIfNeeded() {
@@ -144,6 +149,8 @@ public struct RichTextEditor: NSViewRepresentable {
             guard selectedRange.location <= layoutManager.numberOfGlyphs else {
                 return
             }
+            
+            layoutManager.ensureLayout(for: textContainer)
 
             let caretRect = layoutManager.boundingRect(
                 forGlyphRange: NSRange(location: selectedRange.location, length: 0),
@@ -154,7 +161,9 @@ public struct RichTextEditor: NSViewRepresentable {
             let visibleHeight = visibleRect.height
             let visibleOriginY = visibleRect.origin.y
 
-            let caretBottomY = caretRect.maxY
+            let caretInView = textView.convert(caretRect, to: scrollView.contentView)
+
+            let caretBottomY = caretInView.maxY
             let caretBottomInVisible = caretBottomY - visibleOriginY
             let threshold = visibleHeight - parent.minimumBottomPadding
 
@@ -162,8 +171,13 @@ public struct RichTextEditor: NSViewRepresentable {
                 let targetY = caretBottomY - visibleHeight + parent.minimumBottomPadding
                 let maxY = textView.bounds.height - visibleHeight
                 let constrainedY = min(max(targetY, 0), maxY)
-                scrollView.contentView.scroll(to: NSPoint(x: 0, y: constrainedY))
-                scrollView.reflectScrolledClipView(scrollView.contentView)
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.2
+                    context.allowsImplicitAnimation = true
+                    scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: constrainedY))
+                    scrollView.reflectScrolledClipView(scrollView.contentView)
+                }
+
             }
         }
     }
