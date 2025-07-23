@@ -66,7 +66,8 @@ public struct RichTextEditor: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
-
+        scrollView.autoresizesSubviews = true
+        
         // 2) Create the text view
         let textView = NSTextView()
         textView.isRichText = true
@@ -75,6 +76,7 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.allowsUndo = true
         textView.backgroundColor = .clear
         textView.textContainer?.widthTracksTextView = true
+        textView.autoresizingMask = [.width]  // Ensure it resizes with the scrollView
 
         // Initialize with the bound attributed text
         textView.textStorage?.setAttributedString(attributedText)
@@ -89,15 +91,18 @@ public struct RichTextEditor: NSViewRepresentable {
             name: NSTextView.didChangeSelectionNotification,
             object: textView
         )
-        textView.postsBoundsChangedNotifications = true
+//textView.postsBoundsChangedNotifications = true
 
         // Embed the NSTextView into our focusing scroll view
         scrollView.documentView = textView
+        textView.frame = scrollView.contentView.bounds
 
         // Store references in the coordinator
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
-
+        DispatchQueue.main.async {
+             scrollView.window?.makeFirstResponder(textView)
+         }
         return scrollView
     }
 
