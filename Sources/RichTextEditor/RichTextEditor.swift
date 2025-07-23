@@ -43,7 +43,7 @@ public struct RichTextEditor: NSViewRepresentable {
     @Binding public var attributedText: NSAttributedString
     @Binding public var inspectorVersion: UUID
     public var minimumBottomPadding: CGFloat
-
+    
     public init(
         attributedText: Binding<NSAttributedString>,
         inspector: Binding<UUID>,
@@ -53,11 +53,11 @@ public struct RichTextEditor: NSViewRepresentable {
         self._inspectorVersion = inspector
         self.minimumBottomPadding = minimumBottomPadding
     }
-
+    
     public func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-
+    
     /// Return the FocusingScrollView so clicks inside it can become first responder.
     public func makeNSView(context: Context) -> NSScrollView {
         // 1) Create our custom scroll view
@@ -77,13 +77,13 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.textContainer?.widthTracksTextView = true
         textView.autoresizingMask = [.width]  // Ensure it resizes with the scrollView
-
+        
         // Initialize with the bound attributed text
         textView.textStorage?.setAttributedString(attributedText)
-
+        
         // Set delegate to catch typing
         textView.delegate = context.coordinator
-
+        
         // Let us know when the selection (caret) moves
         NotificationCenter.default.addObserver(
             context.coordinator,
@@ -91,55 +91,155 @@ public struct RichTextEditor: NSViewRepresentable {
             name: NSTextView.didChangeSelectionNotification,
             object: textView
         )
-//textView.postsBoundsChangedNotifications = true
-
+        //textView.postsBoundsChangedNotifications = true
+        
         // Embed the NSTextView into our focusing scroll view
         scrollView.documentView = textView
         textView.frame = scrollView.contentView.bounds
-
+        
         // Store references in the coordinator
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
         DispatchQueue.main.async {
-             scrollView.window?.makeFirstResponder(textView)
-         }
+            scrollView.window?.makeFirstResponder(textView)
+        }
         return scrollView
     }
-
+    
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
         // Whenever the binding changes, update the text storage unconditionally
-      /*  guard let textView = nsView.documentView as? NSTextView else {
-            return
-        }
-       */
+        /*  guard let textView = nsView.documentView as? NSTextView else {
+         return
+         }
+         */
         guard let textView = nsView.documentView as? NSTextView else { return }
-
-        textView.textStorage?.setAttributedString(attributedText)
-    }
-
+        // Avoid unnecessary full content replacement
+        if textView.attributedString() != attributedText {
+            textView.textStorage?.setAttributedString(attributedText)
+        }    }
+    /*
+     public class Coordinator: NSObject, NSTextViewDelegate {
+     var parent: RichTextEditor
+     var textView: NSTextView?
+     var scrollView: NSScrollView?
+     
+     private var updateWorkItem: DispatchWorkItem?
+     
+     init(_ parent: RichTextEditor) {
+     self.parent = parent
+     }
+     
+     public func textDidChange(_ notification: Notification) {
+     guard let textView = notification.object as? NSTextView else { return }
+     
+     // Throttle updates
+     updateWorkItem?.cancel()
+     let workItem = DispatchWorkItem { [weak self] in
+     guard let self = self else { return }
+     self.parent.attributedText = textView.attributedString()
+     }
+     updateWorkItem = workItem
+     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
+     
+     scrollCaretIfNeeded()
+     }
+     
+     
+     @objc func textViewSelectionDidChange(_ notification: Notification) {
+     DispatchQueue.main.async{
+     self.scrollCaretIfNeeded()
+     }
+     }
+     
+     private func scrollCaretIfNeeded() {
+     guard
+     let textView = textView,
+     let scrollView = scrollView,
+     let layoutManager = textView.layoutManager,
+     let textContainer = textView.textContainer
+     else {
+     return
+     }
+     
+     let selectedRange = textView.selectedRange()
+     guard selectedRange.location <= layoutManager.numberOfGlyphs else {
+     return
+     }
+     
+     layoutManager.ensureLayout(for: textContainer)
+     
+     let caretRect = layoutManager.boundingRect(
+     forGlyphRange: NSRange(location: selectedRange.location, length: 0),
+     in: textContainer
+     )
+     
+     let visibleRect = scrollView.contentView.bounds
+     let visibleHeight = visibleRect.height
+     let visibleOriginY = visibleRect.origin.y
+     
+     let caretInView = textView.convert(caretRect, to: scrollView.contentView)
+     
+     let caretBottomY = caretInView.maxY
+     let caretBottomInVisible = caretBottomY - visibleOriginY
+     let threshold = visibleHeight - parent.minimumBottomPadding
+     
+     if caretBottomInVisible > threshold {
+     let targetY = caretBottomY - visibleHeight + parent.minimumBottomPadding
+     let maxY = textView.bounds.height - visibleHeight
+     let constrainedY = min(max(targetY, 0), maxY)
+     NSAnimationContext.runAnimationGroup { context in
+     context.duration = 0.2
+     context.allowsImplicitAnimation = true
+     scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: constrainedY))
+     scrollView.reflectScrolledClipView(scrollView.contentView)
+     }
+     
+     }
+     }
+     }
+     */
     public class Coordinator: NSObject, NSTextViewDelegate {
         var parent: RichTextEditor
-        var textView: NSTextView?
-        var scrollView: NSScrollView?
-
+        weak var textView: NSTextView?
+        weak var scrollView: NSScrollView?
+        
+        private var updateWorkItem: DispatchWorkItem?
+        private var lastSyncedTextHash: Int = 0
+        
         init(_ parent: RichTextEditor) {
             self.parent = parent
         }
-
+        
         public func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
-            parent.attributedText = textView.attributedString()
-            DispatchQueue.main.async{
-                self.scrollCaretIfNeeded()
+            
+            // Throttle SwiftUI binding updates to avoid layout thrashing
+            updateWorkItem?.cancel()
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                let currentText = textView.attributedString()
+                let currentHash = currentText.hashValue
+                
+                // Only update binding if content has changed
+                if currentHash != self.lastSyncedTextHash {
+                    self.lastSyncedTextHash = currentHash
+                    self.parent.attributedText = currentText
+                }
             }
+            updateWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
+            
+            // Scroll immediately for responsiveness
+            scrollCaretIfNeeded()
         }
-
+        
         @objc func textViewSelectionDidChange(_ notification: Notification) {
-            DispatchQueue.main.async{
+            // Scroll after selection settles (prevent multiple rapid scrolls)
+            DispatchQueue.main.async {
                 self.scrollCaretIfNeeded()
             }
         }
-
+        
         private func scrollCaretIfNeeded() {
             guard
                 let textView = textView,
@@ -149,40 +249,44 @@ public struct RichTextEditor: NSViewRepresentable {
             else {
                 return
             }
-
+            
             let selectedRange = textView.selectedRange()
-            guard selectedRange.location <= layoutManager.numberOfGlyphs else {
-                return
-            }
+            guard selectedRange.location <= layoutManager.numberOfGlyphs else { return }
             
             layoutManager.ensureLayout(for: textContainer)
-
+            
             let caretRect = layoutManager.boundingRect(
                 forGlyphRange: NSRange(location: selectedRange.location, length: 0),
                 in: textContainer
             )
-
-            let visibleRect = scrollView.contentView.bounds
-            let visibleHeight = visibleRect.height
-            let visibleOriginY = visibleRect.origin.y
-
+            
+            // Convert to scroll view coordinate space
             let caretInView = textView.convert(caretRect, to: scrollView.contentView)
-
+            
+            let visibleRect = scrollView.contentView.bounds
             let caretBottomY = caretInView.maxY
-            let caretBottomInVisible = caretBottomY - visibleOriginY
-            let threshold = visibleHeight - parent.minimumBottomPadding
-
-            if caretBottomInVisible > threshold {
-                let targetY = caretBottomY - visibleHeight + parent.minimumBottomPadding
-                let maxY = textView.bounds.height - visibleHeight
+            let threshold = visibleRect.maxY - parent.minimumBottomPadding
+            
+            if caretBottomY > threshold {
+                let targetY = caretBottomY - visibleRect.height + parent.minimumBottomPadding
+                let maxY = textView.bounds.height - visibleRect.height
                 let constrainedY = min(max(targetY, 0), maxY)
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.2
-                    context.allowsImplicitAnimation = true
-                    scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: constrainedY))
+                
+                // Use animation only if scroll is significant
+                let deltaY = abs(scrollView.contentView.bounds.origin.y - constrainedY)
+                let shouldAnimate = deltaY > 2
+                
+                if shouldAnimate {
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = 0.2
+                        context.allowsImplicitAnimation = true
+                        scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: constrainedY))
+                        scrollView.reflectScrolledClipView(scrollView.contentView)
+                    }
+                } else {
+                    scrollView.contentView.scroll(to: NSPoint(x: 0, y: constrainedY))
                     scrollView.reflectScrolledClipView(scrollView.contentView)
                 }
-
             }
         }
     }
