@@ -51,21 +51,24 @@ final class HostingTextView: NSTextView {
 
 public struct RichTextEditor: NSViewRepresentable {
     @ObservedObject public var content: RichTextModel
-    
+   
   
     @Binding public var inspectorVersion: UUID
     public var minimumBottomPadding: CGFloat
-
+    public var undoManager: UndoManager? = nil  // ← Add this
 
     public init(
-        content: RichTextModel,
-           inspector: Binding<UUID>,
-           minimumBottomPadding: CGFloat = 40
+        content: ObservedObject<RichTextModel>,
+        inspector: Binding<UUID>,
+        minimumBottomPadding: CGFloat = 40,
+        undoManager: UndoManager? = nil
     ) {
-        self.content = content
+        self._content = content
         self._inspectorVersion = inspector
         self.minimumBottomPadding = minimumBottomPadding
+        self.undoManager = undoManager
     }
+
     
     public func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -161,25 +164,32 @@ public struct RichTextEditor: NSViewRepresentable {
         public func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
 
-            // Don’t react to programmatic updates
-            if isProgrammaticUpdate { return }
-
             updateWorkItem?.cancel()
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
-                let currentText = textView.attributedString()
-                let currentHash = currentText.hashValue
 
-                if currentHash != self.lastSyncedTextHash {
-                    self.lastSyncedTextHash = currentHash
+                let currentText = textView.attributedString()
+                let previousText = self.parent.content.attributedString
+
+                if currentText != previousText {
+                    // Register undo
+                    if let undoManager = self.parent.undoManager {
+                        undoManager.registerUndo(withTarget: self.parent.content) { target in
+                            target.attributedString = previousText
+                        }
+                        undoManager.setActionName("Edit Text")
+                    }
+
                     self.parent.content.attributedString = currentText
                 }
             }
+
             updateWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
 
             scrollCaretIfNeeded()
         }
+
 
         
         @objc func textViewSelectionDidChange(_ notification: Notification) {
