@@ -18,13 +18,13 @@ public class RichTextModel: ObservableObject, Codable {
 
   //  var attributes : [NSAttributedString.Key:Any] = [:]
     /// Create an empty KishoRichText (i.e. an empty string).
-    init() {
+    public  init() {
         self.attributedString = NSAttributedString(string: "")
     }
 
     /// Create from existing RTF data.
     /// If the data cannot be decoded, falls back to an empty string.
-    init(rtfData: Data) {
+    public  init(rtfData: Data) {
         if let decoded = try? NSAttributedString(
             data: rtfData,
             options: [.documentType: NSAttributedString.DocumentType.rtf],
@@ -63,11 +63,11 @@ public class RichTextModel: ObservableObject, Codable {
         try container.encode(rtfData, forKey: .rtfData)
     }
     
-    func flushContent()  {
+    public  func flushContent()  {
         self.attributedString = NSAttributedString(string: "")
     }
     
-    func copy() -> RichTextModel {
+    public  func copy() -> RichTextModel {
          let new = RichTextModel()
          new.attributedString = NSAttributedString(attributedString: self.attributedString)
          return new
@@ -78,7 +78,7 @@ public class RichTextModel: ObservableObject, Codable {
 
 extension RichTextModel {
 
-    func applyTypography(font: NSFont, color: NSColor? = nil) {
+    public  func applyTypography(font: NSFont, color: NSColor? = nil) {
         let fullRange = NSRange(location: 0, length: attributedString.length)
         let mutableCopy = NSMutableAttributedString(attributedString: attributedString)
 
@@ -106,7 +106,7 @@ extension RichTextModel {
     /// Paragraph boundaries are determined using NSString’s `.byParagraphs` enumeration,
     /// so each returned wrapper contains exactly one paragraph (including any attached
     /// newline or paragraph‐separator attributes).
-    func paragraphs() -> [RichTextModel] {
+    public  func paragraphs() -> [RichTextModel] {
         let full = self.attributedString
         let fullNSString = full.string as NSString
         var result: [RichTextModel] = []
@@ -138,7 +138,7 @@ extension RichTextModel {
         /// - If the attributed string is empty (after trimming whitespace/newlines), returns "Untitled".
         /// - Otherwise, enumerates by sentences; if it finds a sentence with ≤ 20 words, returns that.
         /// - If no sentence under 20 words is found, returns the first 20 words of the text joined by spaces.
-        var defaultTitle: String {
+    public  var defaultTitle: String {
             // 1) Get the plain string and trim whitespace/newlines
             let fullString = attributedString.string.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !fullString.isEmpty else {
@@ -181,7 +181,7 @@ extension RichTextModel {
 
         /// Returns a new KishoRichText which is the concatenation of `parts`,
         /// with a single newline inserted between each part’s attributed string.
-        static func joined(_ parts: [RichTextModel]) -> RichTextModel {
+    public  static func joined(_ parts: [RichTextModel]) -> RichTextModel {
             let result = RichTextModel()
             let combined = NSMutableAttributedString()
 
@@ -205,7 +205,7 @@ extension RichTextModel {
 /// Convenience extension to export NSAttributedString as RTF data.
 extension NSAttributedString {
     /// Returns RTF data for the entire string. If encoding fails, returns empty Data.
-    func rtfData() -> Data {
+    public  func rtfData() -> Data {
         return (try? self.data(
             from: NSRange(location: 0, length: self.length),
             documentAttributes: [
