@@ -93,6 +93,11 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.backgroundColor = NSColor.textBackgroundColor
+        textView.isContinuousSpellCheckingEnabled = true
+        textView.isAutomaticSpellingCorrectionEnabled = true
+        textView.isAutomaticTextReplacementEnabled = true
+        textView.isGrammarCheckingEnabled = true
+        textView.isAutomaticQuoteSubstitutionEnabled = true
 
 
         textView.textContainer?.widthTracksTextView = true
