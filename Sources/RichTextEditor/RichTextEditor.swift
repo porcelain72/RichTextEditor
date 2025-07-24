@@ -50,17 +50,19 @@ final class HostingTextView: NSTextView {
 }
 
 public struct RichTextEditor: NSViewRepresentable {
-    @Binding public var attributedText: NSAttributedString
+    @ObservedObject public var content: RichTextModel
+    
+  
     @Binding public var inspectorVersion: UUID
     public var minimumBottomPadding: CGFloat
 
 
     public init(
-        attributedText: Binding<NSAttributedString>,
-        inspector: Binding<UUID>,
-        minimumBottomPadding: CGFloat = 40
+        content: RichTextModel,
+           inspector: Binding<UUID>,
+           minimumBottomPadding: CGFloat = 40
     ) {
-        self._attributedText = attributedText
+        self.content = content
         self._inspectorVersion = inspector
         self.minimumBottomPadding = minimumBottomPadding
     }
@@ -94,7 +96,7 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.autoresizingMask = [.width]  // Ensure it resizes with the scrollView
         
         // Initialize with the bound attributed text
-        textView.textStorage?.setAttributedString(attributedText)
+        textView.textStorage?.setAttributedString(content.attributedString)
         
         // Set delegate to catch typing
         textView.delegate = context.coordinator
@@ -129,7 +131,7 @@ public struct RichTextEditor: NSViewRepresentable {
         // Skip update if user is editing
         if context.coordinator.isProgrammaticUpdate { return }
 
-        let currentStored = context.coordinator.parent.attributedText
+        let currentStored = context.coordinator.parent.content.attributedString
         let currentVisible = textView.attributedString()
 
         if currentStored != currentVisible {
@@ -170,7 +172,7 @@ public struct RichTextEditor: NSViewRepresentable {
 
                 if currentHash != self.lastSyncedTextHash {
                     self.lastSyncedTextHash = currentHash
-                    self.parent.attributedText = currentText
+                    self.parent.content.attributedString = currentText
                 }
             }
             updateWorkItem = workItem
