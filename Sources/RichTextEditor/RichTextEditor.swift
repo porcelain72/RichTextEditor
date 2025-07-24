@@ -74,8 +74,8 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
-        textView.drawsBackground = true
-        textView.backgroundColor = NSColor.windowBackgroundColor
+        textView.backgroundColor = NSColor.textBackgroundColor
+
 
         textView.textContainer?.widthTracksTextView = true
         textView.autoresizingMask = [.width]  // Ensure it resizes with the scrollView
