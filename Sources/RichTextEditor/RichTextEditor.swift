@@ -58,12 +58,12 @@ public struct RichTextEditor: NSViewRepresentable {
     public var undoManager: UndoManager? = nil  // ← Add this
 
     public init(
-        content: ObservedObject<RichTextModel>,
+        content: RichTextModel,
         inspector: Binding<UUID>,
         minimumBottomPadding: CGFloat = 40,
         undoManager: UndoManager? = nil
     ) {
-        self._content = content
+        self.content = content
         self._inspectorVersion = inspector
         self.minimumBottomPadding = minimumBottomPadding
         self.undoManager = undoManager
