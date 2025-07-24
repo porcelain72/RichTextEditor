@@ -39,11 +39,22 @@ public final class FocusingScrollView: NSScrollView {
     }
 }
 
+
+final class HostingTextView: NSTextView {
+    weak var coordinator: RichTextEditor.Coordinator?
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        coordinator?.applyDisplayOverride()
+    }
+}
+
 public struct RichTextEditor: NSViewRepresentable {
     @Binding public var attributedText: NSAttributedString
     @Binding public var inspectorVersion: UUID
     public var minimumBottomPadding: CGFloat
-    
+
+
     public init(
         attributedText: Binding<NSAttributedString>,
         inspector: Binding<UUID>,
@@ -69,7 +80,9 @@ public struct RichTextEditor: NSViewRepresentable {
         scrollView.autoresizesSubviews = true
         
         // 2) Create the text view
-        let textView = NSTextView()
+        let textView = HostingTextView()
+        textView.coordinator = context.coordinator
+
         textView.isRichText = true
         textView.isEditable = true
         textView.isSelectable = true
@@ -95,6 +108,8 @@ public struct RichTextEditor: NSViewRepresentable {
         )
         //textView.postsBoundsChangedNotifications = true
         
+    
+
         // Embed the NSTextView into our focusing scroll view
         scrollView.documentView = textView
         textView.frame = scrollView.contentView.bounds
@@ -109,16 +124,16 @@ public struct RichTextEditor: NSViewRepresentable {
     }
     
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
-        // Whenever the binding changes, update the text storage unconditionally
-        /*  guard let textView = nsView.documentView as? NSTextView else {
-         return
-         }
-         */
         guard let textView = nsView.documentView as? NSTextView else { return }
-        // Avoid unnecessary full content replacement
-        if textView.attributedString() != attributedText {
-            textView.textStorage?.setAttributedString(attributedText)
-        }    }
+
+        let currentStored = context.coordinator.parent.attributedText
+        let currentVisible = textView.attributedString()
+
+        if currentStored.string != currentVisible.string {
+            context.coordinator.applyDisplayOverride()
+        }
+    }
+
 
     public class Coordinator: NSObject, NSTextViewDelegate {
         var parent: RichTextEditor
@@ -162,6 +177,23 @@ public struct RichTextEditor: NSViewRepresentable {
             }
         }
         
+        func applyDisplayOverride() {
+            guard let textView = textView else { return }
+
+            let original = parent.attributedText
+            let mutable = NSMutableAttributedString(attributedString: original)
+
+            // Override visible foreground color to adapt to theme
+            mutable.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: mutable.length)) { value, range, _ in
+                if value != nil {
+                    mutable.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+                }
+            }
+
+            // Don't trigger delegate or scroll
+            textView.textStorage?.setAttributedString(mutable)
+        }
+
         private func scrollCaretIfNeeded() {
             guard
                 let textView = textView,
