@@ -126,15 +126,21 @@ public struct RichTextEditor: NSViewRepresentable {
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
 
+        // Skip update if user is editing
+        if context.coordinator.isProgrammaticUpdate { return }
+
         let currentStored = context.coordinator.parent.attributedText
         let currentVisible = textView.attributedString()
 
         if currentStored != currentVisible {
+            context.coordinator.isProgrammaticUpdate = true
             textView.textStorage?.setAttributedString(currentStored)
             context.coordinator.lastSyncedTextHash = currentStored.hashValue
             context.coordinator.applyDisplayOverride()
+            context.coordinator.isProgrammaticUpdate = false
         }
     }
+
 
 
     public class Coordinator: NSObject, NSTextViewDelegate {
@@ -144,6 +150,7 @@ public struct RichTextEditor: NSViewRepresentable {
         
         private var updateWorkItem: DispatchWorkItem?
         fileprivate var lastSyncedTextHash: Int = 0
+        fileprivate var isProgrammaticUpdate = false
 
         init(_ parent: RichTextEditor) {
             self.parent = parent
@@ -151,15 +158,16 @@ public struct RichTextEditor: NSViewRepresentable {
         
         public func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
-            
-            // Throttle SwiftUI binding updates to avoid layout thrashing
+
+            // Don’t react to programmatic updates
+            if isProgrammaticUpdate { return }
+
             updateWorkItem?.cancel()
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
                 let currentText = textView.attributedString()
                 let currentHash = currentText.hashValue
-                
-                // Only update binding if content has changed
+
                 if currentHash != self.lastSyncedTextHash {
                     self.lastSyncedTextHash = currentHash
                     self.parent.attributedText = currentText
@@ -167,10 +175,10 @@ public struct RichTextEditor: NSViewRepresentable {
             }
             updateWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
-            
-            // Scroll immediately for responsiveness
+
             scrollCaretIfNeeded()
         }
+
         
         @objc func textViewSelectionDidChange(_ notification: Notification) {
             // Scroll after selection settles (prevent multiple rapid scrolls)
