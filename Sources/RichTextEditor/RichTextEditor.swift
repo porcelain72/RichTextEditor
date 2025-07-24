@@ -74,7 +74,9 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
-        textView.backgroundColor = .clear
+        textView.drawsBackground = true
+        textView.backgroundColor = NSColor.windowBackgroundColor
+
         textView.textContainer?.widthTracksTextView = true
         textView.autoresizingMask = [.width]  // Ensure it resizes with the scrollView
         
@@ -117,87 +119,7 @@ public struct RichTextEditor: NSViewRepresentable {
         if textView.attributedString() != attributedText {
             textView.textStorage?.setAttributedString(attributedText)
         }    }
-    /*
-     public class Coordinator: NSObject, NSTextViewDelegate {
-     var parent: RichTextEditor
-     var textView: NSTextView?
-     var scrollView: NSScrollView?
-     
-     private var updateWorkItem: DispatchWorkItem?
-     
-     init(_ parent: RichTextEditor) {
-     self.parent = parent
-     }
-     
-     public func textDidChange(_ notification: Notification) {
-     guard let textView = notification.object as? NSTextView else { return }
-     
-     // Throttle updates
-     updateWorkItem?.cancel()
-     let workItem = DispatchWorkItem { [weak self] in
-     guard let self = self else { return }
-     self.parent.attributedText = textView.attributedString()
-     }
-     updateWorkItem = workItem
-     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
-     
-     scrollCaretIfNeeded()
-     }
-     
-     
-     @objc func textViewSelectionDidChange(_ notification: Notification) {
-     DispatchQueue.main.async{
-     self.scrollCaretIfNeeded()
-     }
-     }
-     
-     private func scrollCaretIfNeeded() {
-     guard
-     let textView = textView,
-     let scrollView = scrollView,
-     let layoutManager = textView.layoutManager,
-     let textContainer = textView.textContainer
-     else {
-     return
-     }
-     
-     let selectedRange = textView.selectedRange()
-     guard selectedRange.location <= layoutManager.numberOfGlyphs else {
-     return
-     }
-     
-     layoutManager.ensureLayout(for: textContainer)
-     
-     let caretRect = layoutManager.boundingRect(
-     forGlyphRange: NSRange(location: selectedRange.location, length: 0),
-     in: textContainer
-     )
-     
-     let visibleRect = scrollView.contentView.bounds
-     let visibleHeight = visibleRect.height
-     let visibleOriginY = visibleRect.origin.y
-     
-     let caretInView = textView.convert(caretRect, to: scrollView.contentView)
-     
-     let caretBottomY = caretInView.maxY
-     let caretBottomInVisible = caretBottomY - visibleOriginY
-     let threshold = visibleHeight - parent.minimumBottomPadding
-     
-     if caretBottomInVisible > threshold {
-     let targetY = caretBottomY - visibleHeight + parent.minimumBottomPadding
-     let maxY = textView.bounds.height - visibleHeight
-     let constrainedY = min(max(targetY, 0), maxY)
-     NSAnimationContext.runAnimationGroup { context in
-     context.duration = 0.2
-     context.allowsImplicitAnimation = true
-     scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: constrainedY))
-     scrollView.reflectScrolledClipView(scrollView.contentView)
-     }
-     
-     }
-     }
-     }
-     */
+
     public class Coordinator: NSObject, NSTextViewDelegate {
         var parent: RichTextEditor
         weak var textView: NSTextView?
