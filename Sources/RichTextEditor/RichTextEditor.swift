@@ -129,7 +129,9 @@ public struct RichTextEditor: NSViewRepresentable {
         let currentStored = context.coordinator.parent.attributedText
         let currentVisible = textView.attributedString()
 
-        if currentStored.string != currentVisible.string {
+        if currentStored != currentVisible {
+            textView.textStorage?.setAttributedString(currentStored)
+            context.coordinator.lastSyncedTextHash = currentStored.hashValue
             context.coordinator.applyDisplayOverride()
         }
     }
@@ -141,8 +143,8 @@ public struct RichTextEditor: NSViewRepresentable {
         weak var scrollView: NSScrollView?
         
         private var updateWorkItem: DispatchWorkItem?
-        private var lastSyncedTextHash: Int = 0
-        
+        fileprivate var lastSyncedTextHash: Int = 0
+
         init(_ parent: RichTextEditor) {
             self.parent = parent
         }
@@ -178,20 +180,16 @@ public struct RichTextEditor: NSViewRepresentable {
         }
         
         func applyDisplayOverride() {
-            guard let textView = textView else { return }
+            guard let textView = textView,
+                  let textStorage = textView.textStorage else { return }
 
-            let original = parent.attributedText
-            let mutable = NSMutableAttributedString(attributedString: original)
-
-            // Override visible foreground color to adapt to theme
-            mutable.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: mutable.length)) { value, range, _ in
+            textStorage.beginEditing()
+            textStorage.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: textStorage.length)) { value, range, _ in
                 if value != nil {
-                    mutable.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+                    textStorage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
                 }
             }
-
-            // Don't trigger delegate or scroll
-            textView.textStorage?.setAttributedString(mutable)
+            textStorage.endEditing()
         }
 
         private func scrollCaretIfNeeded() {
