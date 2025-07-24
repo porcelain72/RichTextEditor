@@ -12,7 +12,7 @@ import AppKit
 
 public class RichTextModel: ObservableObject, Codable {
     // MARK: –– Published attributed string
-    @Published var attributedString: NSAttributedString
+    @Published public var attributedString: NSAttributedString
 
     // MARK: –– Designated initializers
 
