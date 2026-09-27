@@ -91,7 +91,12 @@ public struct RichTextEditor: NSViewRepresentable {
         textView.isRichText = true
         textView.isEditable = true
         textView.isSelectable = true
-        textView.allowsUndo = true
+        // Undo is owned by the model layer (the host registers snapshot-based
+        // undo when the content changes). NSTextView's own undo stack records
+        // character ranges that stop matching the storage as soon as the host
+        // resets it (e.g. after a structural change), which corrupts text or
+        // throws on ⌘Z.
+        textView.allowsUndo = false
         textView.backgroundColor = NSColor.textBackgroundColor
         textView.isContinuousSpellCheckingEnabled = true
         textView.isAutomaticSpellingCorrectionEnabled = true
@@ -177,14 +182,8 @@ public struct RichTextEditor: NSViewRepresentable {
                 let previousText = self.parent.content.attributedString
 
                 if currentText != previousText {
-                    // Register undo
-                    if let undoManager = self.parent.undoManager {
-                        undoManager.registerUndo(withTarget: self.parent.content) { target in
-                            target.attributedString = previousText
-                        }
-                        undoManager.setActionName("Edit Text")
-                    }
-
+                    // The host observes `content` and registers its own undo;
+                    // registering another here would double up every step.
                     self.parent.content.attributedString = currentText
                 }
             }
