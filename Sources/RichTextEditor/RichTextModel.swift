@@ -8,7 +8,16 @@
 /// and makes the type `Codable` by round-tripping through RTF data.
 ///
 import Foundation
+#if canImport(AppKit)
 import AppKit
+/// The platform's font and colour classes, so the model compiles for macOS and iOS alike.
+public typealias RichTextFont = NSFont
+public typealias RichTextColor = NSColor
+#elseif canImport(UIKit)
+import UIKit
+public typealias RichTextFont = UIFont
+public typealias RichTextColor = UIColor
+#endif
 
 public class RichTextModel: ObservableObject, Codable {
     // MARK: –– Published attributed string
@@ -78,7 +87,7 @@ public class RichTextModel: ObservableObject, Codable {
 
 extension RichTextModel {
 
-    public  func applyTypography(font: NSFont, color: NSColor? = nil) {
+    public  func applyTypography(font: RichTextFont, color: RichTextColor? = nil) {
         let fullRange = NSRange(location: 0, length: attributedString.length)
         let mutableCopy = NSMutableAttributedString(attributedString: attributedString)
 
