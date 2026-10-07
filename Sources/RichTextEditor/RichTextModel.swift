@@ -148,10 +148,18 @@ extension RichTextModel {
         /// - Otherwise, enumerates by sentences; if it finds a sentence with ≤ 20 words, returns that.
         /// - If no sentence under 20 words is found, returns the first 20 words of the text joined by spaces.
     public  var defaultTitle: String {
+            derivedTitle ?? "Untitled"
+        }
+
+        /// The title that can be derived from the content — the first short
+        /// sentence (≤ 20 words), or the first 20 words — or `nil` when the
+        /// content is empty. Callers that need a user-facing fallback (such
+        /// as a localized "Untitled") should supply their own.
+    public  var derivedTitle: String? {
             // 1) Get the plain string and trim whitespace/newlines
             let fullString = attributedString.string.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !fullString.isEmpty else {
-                return "Untitled"
+                return nil
             }
 
             // 2) Try to find a “short” (≤ 20‐word) sentence
